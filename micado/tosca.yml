@@ -1,0 +1,168 @@
+tosca_definitions_version: tosca_simple_yaml_1_0
+
+imports:
+  - https://raw.githubusercontent.com/micado-scale/tosca/v0.x.2/micado_types.yaml
+
+repositories:
+  docker_hub: https://hub.docker.com/
+
+topology_template:
+  node_templates:
+    nginxapp:
+      type: tosca.nodes.MiCADO.Container.Application.Docker
+      properties:
+        resources:
+          requests:
+            cpu: "200m"
+        env:
+          - name: NGINX_HOST
+            value: "micado.out.re"
+          - name: NGINX_PORT
+            value: "8080"
+          - name: FPM_HOST
+            value: "wordpress"
+          - name: FPM_PORT
+            value: "9000"
+        ports:
+          - target: 8080
+            type: NodePort
+            nodePort: 32349
+          - target: 9432
+            type: NodePort
+            nodePort: 32348
+      artifacts:
+        image:
+          type: tosca.artifacts.Deployment.Image.Container.Docker
+          file: outlandish/bedrock-web
+          repository: docker_hub
+      interfaces:
+        Kubernetes:
+          create:
+            implementation: image
+
+    wordpress:
+      type: tosca.nodes.MiCADO.Container.Application.Docker
+      properties:
+        resources:
+          requests:
+            cpu: "200m"
+        env:
+          - name: DB_HOST
+            value: "db"
+          - name: DB_NAME
+            value: "wordpress"
+          - name: DB_USER
+            value: "wordpress"
+          - name: DB_PASSWORD
+            value: "wordpress"
+          - name: WP_HOME
+            value: "http://micado.out.re:32349"
+        ports:
+          - target: 9000
+      artifacts:
+        image:
+          type: tosca.artifacts.Deployment.Image.Container.Docker
+          file: outlandish/bedrock
+          repository: docker_hub
+      interfaces:
+        Kubernetes:
+          create:
+            implementation: image
+
+    db:
+      type: tosca.nodes.MiCADO.Container.Application.Docker
+      properties:
+        resources:
+          requests:
+            cpu: "200m"
+        env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: "wordpress"
+          - name: MYSQL_USER
+            value: "wordpress"
+          - name: MYSQL_PASSWORD
+            value: "wordpress"
+          - name: MYSQL_DATABASE
+            value: "wordpress"
+        ports:
+          - target: 3306
+      artifacts:
+        image:
+          type: tosca.artifacts.Deployment.Image.Container.Docker
+          file: outlandish/bedrock
+          repository: docker_hub
+      interfaces:
+        Kubernetes:
+          create:
+            implementation: image
+
+    worker_node:
+      type: tosca.nodes.MiCADO.EC2.Compute
+      properties:
+        region_name: eu-west-2
+        image_id: ami-0d7b406d323c92daa
+        instance_type: t2.medium
+        security_group_ids:
+          - "sg-0c60c5f0582d49c2f"
+      interfaces:
+        Occopus:
+          create:
+            inputs:
+              interface_cloud: ec2
+              endpoint_cloud: https://ec2.eu-west-2.amazonaws.com
+      capabilities:
+        host:
+          properties:
+            num_cpus: 2
+            mem_size: 2 GB
+
+  outputs:
+    ports:
+      value: { get_attribute: [ nginxapp, port ]}
+
+  policies:
+    - scalability:
+        type: tosca.policies.Scaling.MiCADO
+        targets: [ worker_node ]
+        properties:
+          sources:
+            - "nginxapp"
+          constants:
+            MAXNODES: 2
+            MAXCONTAINERS: 8
+          queries:
+            REQUESTS: 'sum(nginx_vts_main_connections{instance=~"$Instance", status=~"active|writing|reading|waiting"})'
+          min_instances: 1
+          max_instances: '{{MAXNODES}}'
+          scaling_rule: |
+            reqnodes=0
+            REQUESTS = ceil(REQUESTS/5)
+            if REQUESTS>0:
+              reqconts = min(REQUESTS, MAXCONTAINERS)
+              reqnodes = reqconts/4
+              if reqnodes<m_node_count:
+                m_node_count-=1
+              if reqnodes>m_node_count:
+                m_node_count+=1
+            else:
+              m_node_count = 0
+            print "Number of required nodes:",reqnodes
+            print "Number of requested nodes:",m_node_count
+
+    - scalability:
+        type: tosca.policies.Scaling.MiCADO
+        targets: [ nginxapp, wordpress ]
+        properties:
+          min_instances: 1
+          max_instances: '{{MAXCONTAINERS}}'
+          scaling_rule: |
+            print "Number of active connections:",REQUESTS
+            required_count = 0
+            REQUESTS = ceil(REQUESTS/5)
+            if REQUESTS>0:
+              required_count = min(REQUESTS, MAXCONTAINERS)
+              m_container_count = min(required_count, len(m_nodes) * 4)
+            else:
+              m_container_count = 0
+            print "Number of required containers:",required_count
+            print "Number of requested containers:",m_container_count

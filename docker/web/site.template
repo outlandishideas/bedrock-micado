@@ -1,0 +1,26 @@
+
+upstream site-php {
+    server ${FPM_HOST}:${FPM_PORT};
+}
+
+server {
+
+    listen ${NGINX_PORT};
+    server_name ${NGINX_HOST};
+
+    root /var/www/html/web;
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+
+        fastcgi_pass site-php;
+        fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_intercept_errors on;
+    }
+
+}
