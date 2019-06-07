@@ -89,7 +89,7 @@ topology_template:
       artifacts:
         image:
           type: tosca.artifacts.Deployment.Image.Container.Docker
-          file: outlandish/bedrock
+          file: mysql:5.7
           repository: docker_hub
       interfaces:
         Kubernetes:
