@@ -58,3 +58,14 @@ docker container using the following command
         --volume $PWD:/app \
         composer require wpackagist-plugin/some-plugin --ignore-platform-reqs --no-scripts
         
+## MICADO
+
+Launching on micado is as simple as running `bin/deploy.sh`, however you will need to update the settings
+in `micado/_settings` in order to set the right MICADO_HOST and MICADO_PORT. If not running on AWS you will
+also need to update the TOSCA description in order to set the right credentials for running on a different cloud.
+If changing the MICADO_HOST, you will also have to change the WP_HOME and NGINX_HOST and NGINX_PORT env vars
+in the TOSCA description file.
+
+After launching the app, you will find that the app is available at MICADO_HOST:32349 and the NGINX VTS plugin
+output is available at MICADO_HOST:32348/status. The output here will be used for scaling based on the performance
+of the NGINX virtualhost under strain
