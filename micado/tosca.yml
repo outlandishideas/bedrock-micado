@@ -120,7 +120,7 @@ topology_template:
 
   policies:
     - scalability:
-        type: tosca.policies.Scaling.MiCADO.VirtualMachine.CPU.stressng
+        type: tosca.policies.Scaling.MiCADO.VirtualMachine.CPU.node
         targets: [ worker_node ]
         properties:
           constants:
@@ -184,7 +184,7 @@ policy_types:
     properties:
       alerts:
         type: list
-        description: pre-define alerts for container CPU
+        description: pre-define alerts for container writing vs waiting connections
         default:
           - alert: nginx_overloaded
             expr: '(avg(rate(nginx_vts_main_connections{status=~"writing"}[2m])) - avg(rate(nginx_vts_main_connections{status=~"waiting"}[2m]))) < 0'
@@ -206,7 +206,7 @@ policy_types:
             print('Transient phase, skipping update of containers...')
         required: true
 
-  tosca.policies.Scaling.MiCADO.VirtualMachine.CPU.stressng:
+  tosca.policies.Scaling.MiCADO.VirtualMachine.CPU.node:
     derived_from: tosca.policies.Scaling.MiCADO
     description: base MiCADO policy defining data sources, constants, queries, alerts, limits and rules
     properties:
