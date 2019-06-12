@@ -1,6 +1,6 @@
 #!/bin/sh
 
-settings_file="../micado/_settings"
+settings_file="./micado/_settings"
 
 . $settings_file
 
@@ -25,4 +25,4 @@ if [ -z "$APP_ID" ]; then
 fi
 
 echo "Updating \"$APP_ID\" on MiCADO at $MICADO_MASTER..."
-curl --insecure -s -F file=@"../micado/tosca.yml" -X PUT -u "$SSL_USER":"$SSL_PASS" https://$MICADO_MASTER:$MICADO_PORT/toscasubmitter/v1.0/app/update/$APP_ID | jq
+curl --insecure -s -F file=@"./micado/tosca.yml" -X PUT -u "$SSL_USER":"$SSL_PASS" https://$MICADO_MASTER:$MICADO_PORT/toscasubmitter/v1.0/app/update/$APP_ID | jq
