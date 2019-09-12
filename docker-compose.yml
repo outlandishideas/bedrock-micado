@@ -23,6 +23,8 @@ services:
       WP_HOME: "http://localhost:8080"
       WP_ENV: development
     restart: always
+    ports:
+      - 9253:9253
 
   web:
     image: outlandish/bedrock-web

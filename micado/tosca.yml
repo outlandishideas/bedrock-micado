@@ -13,7 +13,9 @@ topology_template:
       properties:
         resources:
           requests:
-            cpu: "200m"
+            cpu: "250m"
+          limits:
+            cpu: "500m"
         env:
           - name: NGINX_HOST
             value: "micado.out.re"
@@ -43,7 +45,7 @@ topology_template:
       properties:
         resources:
           requests:
-            cpu: "200m"
+            cpu: "250m"
         env:
           - name: DB_HOST
             value: "db"
@@ -55,8 +57,15 @@ topology_template:
             value: "wordpress"
           - name: WP_HOME
             value: "http://micado.out.re:32349"
+          - name: FPM_PM_MAX_CHILDREN
+            value: "40"
+          - name: FPM_PM_MIN_SPARE_SERVERS
+            value: "10"
+          - name: FPM_PM_MAX_SPARE_SERVERS
+            value: "5"
         ports:
           - target: 9000
+          - target: 9253
       artifacts:
         image:
           type: tosca.artifacts.Deployment.Image.Container.Docker
@@ -72,7 +81,11 @@ topology_template:
       properties:
         resources:
           requests:
-            cpu: "200m"
+            cpu: "250m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         env:
           - name: MYSQL_ROOT_PASSWORD
             value: "wordpress"
@@ -99,7 +112,7 @@ topology_template:
       properties:
         region_name: eu-west-2
         image_id: ami-0d7b406d323c92daa
-        instance_type: t2.medium
+        instance_type: t3.small
         security_group_ids:
           - "sg-0c60c5f0582d49c2f"
       interfaces:
@@ -124,8 +137,8 @@ topology_template:
         targets: [ worker_node ]
         properties:
           constants:
-            NODE_TH_MAX: '66'
-            NODE_TH_MIN: '33'
+            NODE_TH_MAX: '50'
+            NODE_TH_MIN: '15'
           min_instances: 1
           max_instances: 10
 
@@ -143,8 +156,8 @@ topology_template:
           constants:
             SERVICE_NAME: 'wordpress'
             SERVICE_FULL_NAME: 'wordpress'
-            SERVICE_TH_MAX: '60'
-            SERVICE_TH_MIN: '25'
+            SERVICE_TH_MAX: '15'
+            SERVICE_TH_MIN: '10'
           min_instances: 1
           max_instances: 10
 
@@ -159,8 +172,8 @@ policy_types:
         description: pre-define alerts for container CPU
         default:
           - alert: wordpress_overloaded
-            expr: 'avg(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="{{SERVICE_FULL_NAME}}"}[30s]))*100 > {{SERVICE_TH_MAX}}'
-            for: 30s
+              expr: 'avg(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="{{SERVICE_FULL_NAME}}"}[30s]))*100 > {{SERVICE_TH_MAX}}'
+            for: 5s
           - alert: wordpress_underloaded
             expr: 'avg(rate(container_cpu_usage_seconds_total{container_label_io_kubernetes_container_name="{{SERVICE_FULL_NAME}}"}[30s]))*100 < {{SERVICE_TH_MIN}}'
             for: 30s
@@ -171,7 +184,7 @@ policy_types:
         default: |
           if len(m_nodes) == m_node_count:
             if wordpress_overloaded and m_node_count > m_container_count:
-              m_container_count+=1
+              m_container_count+=2
             if wordpress_underloaded:
               m_container_count-=1
           else:
@@ -216,10 +229,10 @@ policy_types:
         default:
           - alert: node_overloaded
             expr: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100)) > {{NODE_TH_MAX}}'
-            for: 1m
+            for: 10s
           - alert: node_underloaded
             expr: '(100-(avg(rate(node_cpu{group="worker_cluster",mode="idle"}[60s]))*100)) < {{NODE_TH_MIN}}'
-            for: 1m
+            for: 30s
         required: true
       scaling_rule:
         type: string
